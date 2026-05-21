@@ -1,6 +1,11 @@
-def main():
-    print("Hello from url-shortener!")
+from fastapi import FastAPI
+import random, string
 
+app = FastAPI()
 
-if __name__ == "__main__":
-    main()
+@app.post("/shorten")
+def shorten_url (url: str):
+    if url.startswith("http://") or url.startswith("https://"):
+        return {"url": url}
+    else:
+        return {"error": "Invalid URL"}
