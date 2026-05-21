@@ -1,7 +1,26 @@
 from fastapi import FastAPI
 import random, string
+from contextlib import asynccontextmanager
+import os
+from dotenv import load_dotenv
+import asyncpg
 
-app = FastAPI()
+load_dotenv()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db_pool = await asyncpg.create_pool(
+        min_size = 1,
+        max_size = 10,
+        host = os.getenv("db_host"),
+        user = os.getenv("db_user"),
+        password = os.getenv("db_password"),
+        database = os.getenv("db_name")
+    )
+    app.state.db_pool = db_pool
+    yield
+    await db_pool.close()
+    
+app = FastAPI(lifespan=lifespan)
 
 storage = {}
 
@@ -19,7 +38,6 @@ async def shorten_url (url: str):
 @app.get("/{shortened_url}")
 async def redirect(shortened_url: str):
     for url, code in storage.items():
-        if code == short_code:
-            return {"original_url": url}
-        else:
-            return {"error": "short_url not found"}
+        if code == shortened_url:
+            return {"long_url": url}
+    return {"error": "Shortened URL not found"}
