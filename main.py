@@ -16,3 +16,10 @@ async def shorten_url (url: str):
     else:
         return {"error": "Invalid URL"}
 
+@app.get("/{shortened_url}")
+async def redirect(shortened_url: str):
+    for url, code in storage.items():
+        if code == short_code:
+            return {"original_url": url}
+        else:
+            return {"error": "short_url not found"}
