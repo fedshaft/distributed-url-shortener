@@ -22,22 +22,23 @@ async def lifespan(app: FastAPI):
     
 app = FastAPI(lifespan=lifespan)
 
-storage = {}
-
 @app.post("/shorten")
 async def shorten_url (url: str):
-    if url.startswith("http://") or url.startswith("https://"):
-        if url not in storage:
-            storage[url] = ''.join(random.choices(string.ascii_letters + string.digits, k = 6))
-            return {"shortened_url": storage[url]}
-        else:
-            return {"shortened_url": storage[url]}
-    else:
-        return {"error": "Invalid URL"}
-
+    if not url.startswith("http://") and not url.startswith("https://"):
+        return {"error": "Invalid URL format"}
+    async with app.state.db_pool.acquire() as conn:
+        result = await conn.fetchrow("select short_code from urls where long_url = $1", url)
+        if result:
+            return {"shortened_url": result['short_code']}
+        shortened_url = ''.join(random.choices(string.ascii_letters + string.digits, k=6))
+        await conn.execute("insert into urls (long_url, short_code) values ($1, $2)", url, shortened_url)
+    return {"shortened_url": shortened_url}
+    
+        
 @app.get("/{shortened_url}")
 async def redirect(shortened_url: str):
-    for url, code in storage.items():
-        if code == shortened_url:
-            return {"long_url": url}
-    return {"error": "Shortened URL not found"}
+    async with app.state.db_pool.acquire() as conn:
+        result = await conn.fetchrow("select long_url from urls where short_code = $1", shortened_url)
+        if not result:
+            return {"error": "Shortened URL not found"}
+        return {"url": result['long_url']}
