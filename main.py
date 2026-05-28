@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 import os
 from dotenv import load_dotenv
 import asyncpg
-
+from redis import asyncio as aioredis
 
 load_dotenv()
 @asynccontextmanager
@@ -18,19 +18,25 @@ async def lifespan(app: FastAPI):
         password = os.getenv("db_password"),
         database = os.getenv("db_name")
     )
+    cache = aioredis.from_url(os.getenv("redis_url"), decode_responses=True)
+
     app.state.db_pool = db_pool
+    app.state.cache = cache
     yield
     await db_pool.close()
-    
+    await cache.close()
+
 app = FastAPI(lifespan=lifespan)
 
 async def get_conn(request: Request):
     async with request.app.state.db_pool.acquire() as conn:
         yield conn
-    
 
+async def get_cache(request: Request):
+    yield request.app.state.cache
+    
 @app.post("/shorten")
-async def shorten_url(url: str, conn = Depends(get_conn)):
+async def shorten_url(url: str, conn = Depends(get_conn), cache = Depends(get_cache)):
     if not url.startswith("http://") and not url.startswith("https://"):
         return {"error": "Invalid URL format"}
     try:
@@ -42,6 +48,7 @@ async def shorten_url(url: str, conn = Depends(get_conn)):
             short_code = ''.join(random.choices(string.ascii_letters + string.digits,k=6))
             try:
                 await conn.execute("insert into urls (long_url, short_code) values ($1, $2)", url,short_code)
+                await cache.set(short_code, url, ex = 3600)
                 return {"short_code": short_code}
             except asyncpg.UniqueViolationError:
                 continue
@@ -50,10 +57,14 @@ async def shorten_url(url: str, conn = Depends(get_conn)):
         return {"error": str(e)}
 
 @app.get("/{shortened_url}")
-async def redirect(shortened_url: str, conn = Depends(get_conn)):
+async def redirect(shortened_url: str, conn = Depends(get_conn), cache = Depends(get_cache)):
         try:
+            cached_url = await cache.get(shortened_url)
+            if cached_url:
+                return RedirectResponse(cached_url)
             result = await conn.fetchrow("select long_url from urls where short_code = $1", shortened_url)
             if result:
+                await cache.set(shortened_url, result['long_url'], ex = 3600)
                 return RedirectResponse(result['long_url'])
             else:
                 return {"error": "Short URL not found"}
