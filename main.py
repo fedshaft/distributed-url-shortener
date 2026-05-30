@@ -6,6 +6,7 @@ import os
 from dotenv import load_dotenv
 import asyncpg
 from redis import asyncio as aioredis
+from time import time
 
 load_dotenv()
 @asynccontextmanager
@@ -61,12 +62,15 @@ async def redirect(shortened_url: str, conn = Depends(get_conn), cache = Depends
         try:
             cached_url = await cache.get(shortened_url)
             if cached_url:
+                await cache.xadd("analytics", {"short_code" : shortened_url, "timestamp": str(time())})
                 return RedirectResponse(cached_url)
             result = await conn.fetchrow("select long_url from urls where short_code = $1", shortened_url)
             if result:
                 await cache.set(shortened_url, result['long_url'], ex = 3600)
+                await cache.xadd("analytics", {"short_code" : shortened_url, "timestamp": str(time())})
                 return RedirectResponse(result['long_url'])
             else:
                 return {"error": "Short URL not found"}
         except Exception as e:
             return {"error": str(e)}
+        
