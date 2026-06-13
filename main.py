@@ -58,16 +58,17 @@ async def shorten_url(url: str, conn = Depends(get_conn), cache = Depends(get_ca
         return {"error": str(e)}
 
 @app.get("/{shortened_url}")
-async def redirect(shortened_url: str, conn = Depends(get_conn), cache = Depends(get_cache)):
+async def redirect(shortened_url: str, request: Request, cache = Depends(get_cache)):
         try:
             cached_url = await cache.get(shortened_url)
             if cached_url:
-                await cache.xadd("analytics", {"short_code" : shortened_url, "timestamp": str(time())})
+                await cache.xadd("analytics", {"short_code" : shortened_url, "timestamp": str(time())}, maxlen = 1000, approximate=True)
                 return RedirectResponse(cached_url)
-            result = await conn.fetchrow("select long_url from urls where short_code = $1", shortened_url)
+            async with request.app.state.db_pool.acquire() as conn:
+                result = await conn.fetchrow("select long_url from urls where short_code = $1", shortened_url)
             if result:
                 await cache.set(shortened_url, result['long_url'], ex = 3600)
-                await cache.xadd("analytics", {"short_code" : shortened_url, "timestamp": str(time())})
+                await cache.xadd("analytics", {"short_code" : shortened_url, "timestamp": str(time())}, maxlen = 1000, approximate=True)
                 return RedirectResponse(result['long_url'])
             else:
                 return {"error": "Short URL not found"}
