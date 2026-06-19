@@ -28,44 +28,49 @@ async def consume():
         last_id = await conn.fetchval(
             "select last_id from consumer_offsets where stream_name = 'analytics'"
         )
-        if not last_id:
+        if last_id is None:
             last_id = "0"
     while True:
-        entries = await cache.xread({"analytics": last_id}, count=10, block=1000)
-        if not entries:
-            continue
-        rows = []
-        for stream_id, field_dict in entries[0][1]:
-            rows.append(
-                (
-                    stream_id,
-                    field_dict["short_code"],
-                    float(field_dict["timestamp"])  
+        try:
+            entries = await cache.xread({"analytics": last_id}, count=10, block=1000)
+            if not entries:
+                continue
+            rows = []
+            for stream_id, field_dict in entries[0][1]:
+                rows.append(
+                    (
+                        stream_id,
+                        field_dict["short_code"],
+                        float(field_dict["timestamp"])  
+                    )
                 )
-            )
         
-        new_last_id = entries[0][1][-1][0]
+            new_last_id = entries[0][1][-1][0]
         
-        #get a connection for the batch transaction inside the loop
-        async with db_pool.acquire() as conn:
-            async with conn.transaction():
-                await conn.executemany(
-                    """
-                    insert into analytics (stream_id, short_code, clicked_at) 
-                    values ($1, $2, $3)
-                    """, 
-                    rows
-                )
+            #get a connection for the batch transaction inside the loop
+            async with db_pool.acquire() as conn:
+                async with conn.transaction():
+                    await conn.executemany(
+                        """
+                        insert into analytics (stream_id, short_code, clicked_at) 
+                        values ($1, $2, $3)
+                        """, 
+                        rows
+                    )
 
-                await conn.execute(
-                    """
-                    insert into consumer_offsets (stream_name, last_id) 
-                    values ('analytics', $1) 
-                    on conflict (stream_name) 
-                    do update set last_id = EXCLUDED.last_id
-                    """, 
-                    new_last_id
-                )
-        last_id = new_last_id
+                    await conn.execute(
+                        """
+                        insert into consumer_offsets (stream_name, last_id) 
+                        values ('analytics', $1) 
+                        on conflict (stream_name) 
+                        do update set last_id = EXCLUDED.last_id
+                        """, 
+                        new_last_id
+                    )
+            last_id = new_last_id
+        except Exception as e:
+            print(f"Error occurred: {e}")
+            await asyncio.sleep(1)  
+
 if __name__ == "__main__":
     asyncio.run(consume())
