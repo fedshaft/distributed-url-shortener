@@ -57,6 +57,8 @@ async def consume():
                         """, 
                         rows
                     )
+                    print("INSERT DONE")
+                    print("ABOUT TO UPDATE OFFSET")
 
                     await conn.execute(
                         """

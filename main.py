@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request, Depends
 from fastapi.responses import RedirectResponse
+from fastapi.exceptions import HTTPException
 import random, string
 from contextlib import asynccontextmanager
 import os
@@ -39,7 +40,7 @@ async def get_cache(request: Request):
 @app.post("/shorten")
 async def shorten_url(url: str, conn = Depends(get_conn), cache = Depends(get_cache)):
     if not url.startswith("http://") and not url.startswith("https://"):
-        return {"error": "Invalid URL format"}
+        raise HTTPException(status_code = 400, detail = "invalid url format")
     try:
         result = await conn.fetchrow("select short_code from urls where long_url = $1",url)
         if result:
@@ -53,9 +54,11 @@ async def shorten_url(url: str, conn = Depends(get_conn), cache = Depends(get_ca
                 return {"short_code": short_code}
             except asyncpg.UniqueViolationError:
                 continue
-        return {"error": "failed to generate unique short code"}
+        raise HTTPException(status_code = 503, detail = "failed to generate unique short code")
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code = 500, detail = "error occurred while processing the request")
 
 @app.get("/{shortened_url}")
 async def redirect(shortened_url: str, request: Request, cache = Depends(get_cache)):
@@ -71,7 +74,9 @@ async def redirect(shortened_url: str, request: Request, cache = Depends(get_cac
                 await cache.xadd("analytics", {"short_code" : shortened_url, "timestamp": str(time())}, maxlen = 1000, approximate=True)
                 return RedirectResponse(result['long_url'], status_code=302)
             else:
-                return {"error": "Short URL not found"}
+                raise HTTPException(status_code = 404, detail = "shortened url not found")
+        except HTTPException:
+            raise 
         except Exception as e:
-            return {"error": str(e)}
+            raise HTTPException(status_code = 500, detail = "error occurred while processing the request")
         
