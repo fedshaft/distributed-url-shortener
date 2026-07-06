@@ -42,7 +42,7 @@ async def get_cache(request: Request):
     yield request.app.state.cache
     
 @app.post("/shorten")
-async def shorten_url(...):
+async def shorten_url(url: str, conn = Depends(get_conn), cache = Depends(get_cache)):
 
     if not url.startswith(("http://", "https://")):
         raise HTTPException(status_code=400, detail="Invalid URL format")
@@ -54,19 +54,21 @@ async def shorten_url(...):
     if result:
         return {"short_code": result["short_code"]}
     for _ in range(5):
-        short_code = "".join(
-            random.choices(string.ascii_letters + string.digits, k=6)
-        )
+        short_code = "".join(random.choices(string.ascii_letters + string.digits, k=6))
         try:
             await conn.execute("INSERT INTO urls (long_url, short_code) VALUES ($1, $2)",url,short_code)
-            await cache.set(short_code, url, ex=3600)
-            return {"short_code": short_code}
+            try:
+                await cache.set(short_code, url, ex=3600)
+                return {"short_code": short_code}
+            except RedisError:
+                logger.exception("Failed to write to Redis")
+                return {"short_code": short_code}
         except asyncpg.UniqueViolationError:
             continue
         except asyncpg.PostgresError:
             logger.exception("Failed while inserting URL")
             raise HTTPException(status_code=500, detail="Database error")
-    raise HTTPException(status_code=503, detail="Failed to generate unique short code",)
+    raise HTTPException(status_code=503, detail="Failed to generate unique short code")
 
 @app.get("/{shortened_url}")
 async def redirect(shortened_url: str, request: Request, cache=Depends(get_cache)):
