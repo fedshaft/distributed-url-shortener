@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, Depends
 from fastapi.responses import RedirectResponse
 from fastapi import HTTPException
+from pydantic import BaseModel, HttpUrl
 import random, string
 from contextlib import asynccontextmanager
 import os
@@ -12,6 +13,9 @@ from redis.exceptions import RedisError
 import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+class URLRequest(BaseModel):
+    url: HttpUrl
 
 load_dotenv()
 @asynccontextmanager
@@ -42,10 +46,8 @@ async def get_cache(request: Request):
     yield request.app.state.cache
     
 @app.post("/shorten")
-async def shorten_url(url: str, conn = Depends(get_conn), cache = Depends(get_cache)):
-
-    if not url.startswith(("http://", "https://")):
-        raise HTTPException(status_code=400, detail="Invalid URL format")
+async def shorten_url(request: URLRequest, conn = Depends(get_conn), cache = Depends(get_cache)):
+    url = request.url
     try:
         result = await conn.fetchrow("SELECT short_code FROM urls WHERE long_url=$1",url)
     except asyncpg.PostgresError:
