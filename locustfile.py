@@ -1,5 +1,3 @@
-from urllib.parse import urlencode
-
 from locust import task
 from locust.contrib.fasthttp import FastHttpUser
 
@@ -7,7 +5,7 @@ TEST_URL = "https://example.com/loadtest"
 
 class CachedRedirectUser(FastHttpUser):
     def on_start(self):
-        resp = self.client.post(f"/shorten?{urlencode({'url': TEST_URL})}", name="/shorten")
+        resp = self.client.post("/shorten", json={"url": TEST_URL}, name="/shorten")
         self.short_code = resp.json()["short_code"]
     @task
     def cached_redirect(self):
