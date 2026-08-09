@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class URLRequest(BaseModel):
-    url: HttpUrl
+    url: HttpUrl    
 
 load_dotenv()
 @asynccontextmanager
@@ -46,8 +46,8 @@ async def get_cache(request: Request):
     yield request.app.state.cache
     
 @app.post("/shorten")
-async def shorten_url(request: URLRequest, conn = Depends(get_conn), cache = Depends(get_cache)):
-    url = request.url
+async def shorten_url(payload: URLRequest, conn = Depends(get_conn), cache = Depends(get_cache)):
+    url = str(payload.url)
     try:
         result = await conn.fetchrow("SELECT short_code FROM urls WHERE long_url=$1",url)
     except asyncpg.PostgresError:
