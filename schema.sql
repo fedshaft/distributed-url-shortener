@@ -1,6 +1,6 @@
 CREATE TABLE public.urls (
     id SERIAL PRIMARY KEY,
-    long_url TEXT NOT NULL,
+    long_url TEXT UNIQUE NOT NULL,
     short_code VARCHAR(20) UNIQUE NOT NULL
 );
 

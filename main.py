@@ -65,7 +65,14 @@ async def shorten_url(payload: URLRequest, conn = Depends(get_conn), cache = Dep
             except RedisError:
                 logger.exception("Failed to write to Redis")
                 return {"short_code": short_code}
-        except asyncpg.UniqueViolationError:
+        except asyncpg.UniqueViolationError as e:
+            if e.constraint_name == "urls_long_url_key":
+                try:
+                    result = await conn.fetchrow("SELECT short_code FROM urls WHERE long_url=$1",url)
+                except asyncpg.PostgresError:
+                    logger.exception("Failed while reading URL")
+                    raise HTTPException(status_code=500, detail="Database error")
+                return {"short_code": result["short_code"]}
             continue
         except asyncpg.PostgresError:
             logger.exception("Failed while inserting URL")
