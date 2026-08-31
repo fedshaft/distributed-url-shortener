@@ -12,3 +12,7 @@ dependencies = [
     "redis>=8.0.0",
     "uvicorn>=0.47.0",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "strict"
