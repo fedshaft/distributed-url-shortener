@@ -104,6 +104,14 @@ async def shorten_url(payload: URLRequest, conn = Depends(get_conn), cache = Dep
             raise HTTPException(status_code=500, detail="Database error")
     raise HTTPException(status_code=503, detail="Failed to generate unique short code")
 
+@app.get("/")
+async def root():
+    return {"service": "url-shortener", "usage": "POST /shorten {\"url\": \"https://...\"}"}
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
 @app.get("/{shortened_url}")
 async def redirect(shortened_url: str, request: Request, cache=Depends(get_cache)):
     try:
