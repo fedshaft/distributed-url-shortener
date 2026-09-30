@@ -59,7 +59,7 @@ async def lifespan(app: FastAPI):
         except asyncio.CancelledError:
             pass
     await db_pool.close()
-    await cache.close()
+    await cache.aclose()
 
 app = FastAPI(lifespan=lifespan)
 
