@@ -28,9 +28,13 @@ async def redis_connect():
     )
     return cache
 
-async def consume():
-    db_pool = await db_connect()
-    cache = await redis_connect()
+async def consume(db_pool=None, cache=None):
+    # Reuse the API's pool/client when running in-process; build our own
+    # when started as a standalone worker.
+    if db_pool is None:
+        db_pool = await db_connect()
+    if cache is None:
+        cache = await redis_connect()
     async with db_pool.acquire() as conn:
         last_id = await conn.fetchval(
             "select last_id from consumer_offsets where stream_name = 'analytics'"

@@ -10,6 +10,8 @@ import asyncpg
 from redis import asyncio as aioredis
 from time import time
 from redis.exceptions import RedisError
+import asyncio
+from consumer import consume
 import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -43,7 +45,19 @@ async def lifespan(app: FastAPI):
 
     app.state.db_pool = db_pool
     app.state.cache = cache
+
+    consumer_task = None
+    if os.getenv("RUN_CONSUMER", "").lower() in ("1", "true", "yes"):
+        consumer_task = asyncio.create_task(consume(db_pool, cache))
+
     yield
+
+    if consumer_task:
+        consumer_task.cancel()
+        try:
+            await consumer_task
+        except asyncio.CancelledError:
+            pass
     await db_pool.close()
     await cache.close()
 
