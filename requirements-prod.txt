@@ -1,0 +1,7 @@
+# Runtime only. Dev/test/load-testing deps live in requirements.txt.
+asyncpg==0.31.0
+fastapi==0.136.1
+pydantic==2.13.4
+python-dotenv==1.2.2
+redis==8.0.0
+uvicorn==0.47.0
