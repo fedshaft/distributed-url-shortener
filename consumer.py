@@ -7,6 +7,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 async def db_connect():
+    dsn = os.getenv("DATABASE_URL")
+    if dsn:
+        if dsn.startswith("postgres://"):
+            dsn = dsn.replace("postgres://", "postgresql://", 1)
+        return await asyncpg.create_pool(dsn, min_size=1, max_size=10)
     db_pool = await asyncpg.create_pool(
         min_size=1,
         max_size=10,
@@ -18,7 +23,9 @@ async def db_connect():
     return db_pool
 
 async def redis_connect():
-    cache = aioredis.from_url(os.getenv("redis_url"), decode_responses=True)
+    cache = aioredis.from_url(
+        os.getenv("REDIS_URL") or os.getenv("redis_url"), decode_responses=True
+    )
     return cache
 
 async def consume():

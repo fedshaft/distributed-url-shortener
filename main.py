@@ -18,17 +18,28 @@ class URLRequest(BaseModel):
     url: HttpUrl    
 
 load_dotenv()
+def database_dsn():
+    """Managed Postgres hands you one DSN; local dev uses the separate vars."""
+    dsn = os.getenv("DATABASE_URL")
+    if dsn and dsn.startswith("postgres://"):
+        dsn = dsn.replace("postgres://", "postgresql://", 1)
+    return dsn
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    db_pool = await asyncpg.create_pool(
-        min_size = 1,
-        max_size = 10,
-        host = os.getenv("db_host"),
-        user = os.getenv("db_user"),
-        password = os.getenv("db_password"),
-        database = os.getenv("db_name")
-    )
-    cache = aioredis.from_url(os.getenv("redis_url"), decode_responses=True)
+    dsn = database_dsn()
+    if dsn:
+        db_pool = await asyncpg.create_pool(dsn, min_size=1, max_size=10)
+    else:
+        db_pool = await asyncpg.create_pool(
+            min_size = 1,
+            max_size = 10,
+            host = os.getenv("db_host"),
+            user = os.getenv("db_user"),
+            password = os.getenv("db_password"),
+            database = os.getenv("db_name")
+        )
+    cache = aioredis.from_url(os.getenv("REDIS_URL") or os.getenv("redis_url"), decode_responses=True)
 
     app.state.db_pool = db_pool
     app.state.cache = cache
