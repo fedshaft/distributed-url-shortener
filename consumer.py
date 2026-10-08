@@ -48,26 +48,29 @@ async def consume(db_pool=None, cache=None):
                 continue
             rows = []
             for stream_id, field_dict in entries[0][1]:
-                rows.append(
-                    (
-                        stream_id,
-                        field_dict["short_code"],
-                        float(field_dict["timestamp"])  
+                try:
+                    rows.append(
+                        (
+                            stream_id,
+                            field_dict["short_code"],
+                            float(field_dict["timestamp"])
+                        )
                     )
-                )
-        
+                except (KeyError, ValueError) as e:
+                    print(f"Skipping malformed entry {stream_id}: {field_dict!r} ({e!r})")
+
             new_last_id = entries[0][1][-1][0]
-        
-            #get a connection for the batch transaction inside the loop
+    
             async with db_pool.acquire() as conn:
                 async with conn.transaction():
-                    await conn.executemany(
-                        """
-                        insert into analytics (stream_id, short_code, clicked_at) 
-                        values ($1, $2, $3)
-                        """, 
-                        rows
-                    )
+                    if rows:
+                        await conn.executemany(
+                            """
+                            insert into analytics (stream_id, short_code, clicked_at)
+                            values ($1, $2, $3)
+                            """,
+                            rows
+                        )
                     print("INSERT DONE")
                     print("ABOUT TO UPDATE OFFSET")
 
