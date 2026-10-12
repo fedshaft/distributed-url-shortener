@@ -46,6 +46,9 @@ async def lifespan(app: FastAPI):
     app.state.db_pool = db_pool
     app.state.cache = cache
 
+    schema = open("schema.sql").read()
+    await db_pool.execute(schema)
+    
     consumer_task = None
     if os.getenv("RUN_CONSUMER", "").lower() in ("1", "true", "yes"):
         consumer_task = asyncio.create_task(consume(db_pool, cache))
