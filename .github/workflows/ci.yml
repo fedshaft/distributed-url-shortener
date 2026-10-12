@@ -4,6 +4,10 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
+    
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      REDIS_URL: redis://localhost:6379
 
     services:
       postgres: 
