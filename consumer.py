@@ -71,8 +71,6 @@ async def consume(db_pool=None, cache=None):
                             """,
                             rows
                         )
-                    print("INSERT DONE")
-                    print("ABOUT TO UPDATE OFFSET")
 
                     await conn.execute(
                         """
