@@ -17,11 +17,11 @@ services:
           name: shortener-cache
           property: connectionString
 
+  - type: keyvalue
+    name: shortener-cache
+    plan: free
+    ipAllowList: []
+
 databases:
   - name: shortener-db
     plan: free
-
-keyValue:
-  - name: shortener-cache
-    plan: free
-    ipAllowList: []
