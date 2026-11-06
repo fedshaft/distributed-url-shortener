@@ -1,7 +1,5 @@
 # Distributed URL Shortener
 
-[![CI](https://github.com/fedshaft/distributed-url-shortener/actions/workflows/ci.yml/badge.svg)](https://github.com/fedshaft/distributed-url-shortener/actions/workflows/ci.yml)
-
 A high-performance URL shortening service built with **FastAPI**, **PostgreSQL** (asyncpg, raw SQL) and **Redis**. Redirects are served from a Redis cache, and click analytics are streamed out-of-band through **Redis Streams** to a background consumer, keeping the redirect path fast.
 
 **Live demo:** https://url-shortener-jsii.onrender.com · **Try it in the browser:** https://url-shortener-jsii.onrender.com/docs
